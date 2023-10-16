@@ -3,6 +3,11 @@ const express = require('express')
 const app = express()
 
 app.use(express.static(__dirname + '/public'))
+app.set('view engine', 'ejs')
+app.use(express.json())
+app.use(express.urlencoded({
+    extended: true
+}))
 
 // MongoDB 라이브러리 사용관련
 const {
@@ -38,4 +43,40 @@ app.get('/news', (요청, 응답) => {
 
 app.get('/shop', (요청, 응답) => {
     응답.send('쇼핑 페이지임!!!');
+})
+
+app.get('/list', async (요청, 응답) => {
+    let result = await db.collection('post').find().toArray();
+    응답.render('list.ejs', {
+        posts: result
+    })
+})
+
+app.get('/time', (요청, 응답) => {
+    응답.render('time.ejs', {
+        time: new Date()
+    })
+})
+
+app.get('/write', (요청, 응답) => {
+    응답.render('write.ejs');
+})
+
+app.post('/add', async (요청, 응답) => {
+    console.log(요청.body);
+
+    try {
+        if (요청.body.title == '') {
+            응답.send('제목 입력안했는데?');
+        } else {
+            await db.collection('post').insertOne({
+                title: 요청.body.title,
+                content: 요청.body.content
+            })
+            응답.redirect('/list');
+        }
+    } catch (e) {
+        console.log(e);
+        응답.status(500).send('서버에러남')
+    }
 })
