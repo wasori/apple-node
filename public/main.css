@@ -59,3 +59,9 @@ body {
     background : lightgrey;
     border-radius: 5px;
   }
+
+  .detail-bg {
+    background: white;
+    padding: 15px;
+    margin-top: 10px;
+  }

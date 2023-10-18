@@ -1,7 +1,9 @@
 // express 라이브러리를 사용하겠다는 뜻
 const express = require('express')
 const app = express()
+const methodOverride = require('method-override')
 
+app.use(methodOverride('_method'))
 app.use(express.static(__dirname + '/public'))
 app.set('view engine', 'ejs')
 app.use(express.json())
@@ -11,7 +13,8 @@ app.use(express.urlencoded({
 
 // MongoDB 라이브러리 사용관련
 const {
-    MongoClient
+    MongoClient,
+    ObjectId
 } = require('mongodb')
 
 let db
@@ -77,6 +80,53 @@ app.post('/add', async (요청, 응답) => {
         }
     } catch (e) {
         console.log(e);
-        응답.status(500).send('서버에러남')
+        응답.status(500).send('서버에러남');
     }
+})
+
+app.get('/detail/:id', async (요청, 응답) => {
+    try {
+        let result = await db.collection('post').findOne({
+            _id: new ObjectId(요청.params.id)
+        });
+        if (result == null) {
+            응답.status(404).send('이상한 url 입력함');
+        }
+        응답.render('detail.ejs', {
+            result: result
+        });
+    } catch (e) {
+        console.log(e);
+        응답.status(404).send('이상한 url 입력함');
+    }
+
+})
+
+app.get('/edit/:id', async (요청, 응답) => {
+    let result = await db.collection('post').findOne({
+        _id: new ObjectId(요청.params.id)
+    });
+    응답.render('edit.ejs', {
+        result: result
+    });
+})
+
+app.put('/edit', async (요청, 응답) => {
+    // await db.collection('post').updateMany({
+    //     like : {$gt : 10} 
+    // }, {
+    //     $inc: {
+    //         like : 1
+    //     }
+    // });
+    await db.collection('post').updateOne({
+        _id: new ObjectId(요청.body.id)
+    }, {
+        $set: {
+            title: 요청.body.title,
+            content: 요청.body.content
+        }
+    });
+    console.log();
+    응답.redirect('/list');
 })

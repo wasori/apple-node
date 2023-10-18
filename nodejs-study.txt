@@ -400,3 +400,156 @@ app.use(express.urlencoded({
 
 - statis(500)은 서버 잘못으로 인한 에러라는 뜻으로 에러코드를 전송해주는게 좋은 관습이다.
 
+=================================================================================
+
+[ 상세페이지 만들기 1 ( URL parameter ) ]
+
+- /detail/글번호 입력하면 해당 글번호가 가진 글의 상세글을 보여줌
+
+- 글이 100개있으면? => url 파라미터 문법사용. => 비슷한 /url 가진 api 여러개 만들수있음 
+
+- app.get('/detail/:aaaa', () => {
+    
+}) => "유저가 :aaaa자리에 아무 문자나 입력시"
+
+- 모든문자가 같은페이지로 가는데? => 유저가 /detail/1로 접속하면 _id가 1인 글 내용을 ejs파일로 보내기
+
+- 상세페이지 기능 1.유저가 /detail/어쩌구 접속하면
+                             2. {_id : 어쩌구 } 글을 DB에서 찾아서
+	           3. ejs 파일에 박아서 보내줌
+
+- 유저가 글 id를 어떻게 url에 씀? => 글 제목 클릭시 이동하게 만드는 링크를 만드는거임
+
+- 2번기능 app.get('/detail/:aaaa', async(요청, 응답) => {
+   	 	await db.collection('post').findOne({a : 1}) 
+    		응답.render('detail.ejs');
+	})  => {} 데이터를 가진 document 1개 찾아옴
+
+- await db.collection('post').find().toArray(); 모든 document를 가져옴
+
+- 요청.params 쓰면 url 파라미터 자리에 들어간 문자를 알수있다
+
+================================================================================
+
+[ 상세페이지 만들기 2 ( 링크 만들기 ) ]
+
+- ( 참고 ) url 파라미터는 여러개 넣어도 됨 /:123/:123
+
+- 유저가 글 id를 어떻게 url에 씀? => 글 제목 클릭시 이동하게 만드는 링크를 만드는거임 -> <a>태그
+
+- 서버기능을 만들었으면 예외케이스들을 처리해주는게 좋음.
+
+- ex) 누가 url 파라미터에 이상한거적어서 접속하면 어떡할래
+
+- 응답.status(400).send('이상한 url 입력함');
+
+- 5xx : 서버문제 , 4xx : 유저문제
+
+- Q. _id 길이는 맞는데 틀렸을 경우?
+
+- try catch 만으로 잡을수 없음
+
+- 직접 악성유저가 되어 테스트해보는게 좋음
+
+- try {
+        let result = await db.collection('post').findOne({
+            _id: new ObjectId(요청.params.id)
+        });
+        if (result == null) {
+            응답.status(404).send('이상한 url 입력함');
+        }
+        응답.render('detail.ejs', {
+            result: result
+        });
+    } catch (e) {
+        console.log(e);
+        응답.status(404).send('이상한 url 입력함');
+    }
+
+================================================================================
+
+[ 수정 기능 만들기 1 ]
+
+- 게시판기능이랑 비슷함
+
+1. 글마다 수정버튼 누르면 수정페이지로 이동한다
+
+2. 수정페이지엔 기존 글이 채워져있다.
+
+3. 전송누르면 입력한 내용으로 db글 수정
+
+- document 수정하고 싶으면 updateOne()
+
+- db.collection('post').updateOne({a : 1}, { $set : { a : 2}});
+
+- a : 1  도큐먼트를 찾아서 a : 2 로 교체해준다
+
+- ( 팁 ) 서버에서 정보를 찾을 수 없다면 유저에게 보내라고 하거나 / DB에서 꺼내보거나
+
+- 전송버튼 누르면 서버로 전송, 서버는 확인 후 DB수정
+
+- <form class="form-box" action = "/edit" method="POST">
+
+- 수정기능은 PUT method , 삭제기능은 DELETE method 쓰는게 좋은 관습
+
+- <form>에서는 원래 GET, POST만 가능. 굳이 PUT 쓰고싶으면 AJAX나 외부 라이브러리 사용해야함
+
+- app.post('/edit', async (요청, 응답) => {
+
+    await db.collection('post').updateOne({ 수정할 document 정보 }, { $set : { 수정할 내용 }});
+
+})
+
+- 유저가 입력칸에 적은 글들 : 요청 . body
+
+- 직접예외처리도 해보면 좋음 (유저가 _id 이상하게 보내면? 수정할 글 내용이 없으면? 유저가 title, content말고 다른 내용으로 보내면? 이상한 에러로 수정이 실패하면? 등등 )
+
+- (팁) 수정결과 확인가능 : result변수에 담아서 확인
+
+-input 화면 숨기기 가능
+
+==============================================================================
+
+[ 수정기능 만들기 2 ( method - override, MongoDB 수정문법 추가 ) ]
+
+- <form> 써서 PUT, DELETE 요청하는법
+
+- 세팅이 좀 필요함 1. npm install method-override
+                              2. const methodOverride = require('method-override')
+	                 app.use(methodOverride('_method')) 위에 추가
+	            3. <form class="form-box" action = "/edit?_method=PUT" method="POST">
+                                   /요청URL 뒤에 ?_method=PUT 추가
+
+- updateOne 추가문법 
+await db.collection('post').updateOne({
+        _id: 1
+    }, {
+        $inc: {
+            like : 1
+        }
+    });
+
+- $inc : like를 1올려주시오 . -2 적으면 2씩 줄어듦
+- $mul : 기존값에 곱하라는 뜻
+- $unset : 기존 필드값 삭제 ( 거의 안쓰니 알아만 두자 )
+
+- Q. 동시에 여러개 document 수정?
+- await db.collection('post').updateMany({
+        _id: 1
+    }, {
+        $inc: {
+            like : 1
+        }
+    }); => id가 1인거 전부다 적용됨
+
+- 조건식 사용도 가능
+
+- Q.LIKE 항목이 10이상인 document 전부 수정?
+
+- await db.collection('post').updateMany({
+        like : {$gt : 10}  ( like > 10 이라는 뜻  $gte 는 >= 이하는 $lt, $lte like != 는 $ne)
+    }, {
+        $inc: {
+            like : 1
+        }
+    });

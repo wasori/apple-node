@@ -10,13 +10,10 @@
 
     <%- include('nav.ejs') %>
 
-    <div class="white-bg">
-    <% for (let i = 0; i < posts.length; i++){ %>
-      <div class="list-box">
-        <h4><a href="/detail/<%= posts[i]._id %>"><%= posts[i].title %></a><a href = "/edit/<%= posts[i]._id %>">✏️</a></h4>
-        <p><%= posts[i].content %></p>
-      </div>
-    <% } %>
+    
+    <div class="detail-bg">
+        <h4><%= result.title %></h4>
+        <p><%= result.content %></p>
     </div> 
   
   </body>
