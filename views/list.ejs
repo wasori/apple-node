@@ -1,23 +1,48 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <link href="/main.css" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <link href="/main.css" rel="stylesheet">
 </head>
+
 <body class="grey-bg">
 
-    <%- include('nav.ejs') %>
+  <%- include('nav.ejs') %>
 
     <div class="white-bg">
-    <% for (let i = 0; i < posts.length; i++){ %>
-      <div class="list-box">
-        <h4><a href="/detail/<%= posts[i]._id %>"><%= posts[i].title %></a><a href = "/edit/<%= posts[i]._id %>">✏️</a></h4>
-        <p><%= posts[i].content %></p>
-      </div>
-    <% } %>
-    </div> 
-  
-  </body>
+      <% for (let i=0; i < posts.length; i++){ %>
+        <div class="list-box">
+          <h4>
+            <a href="/detail/<%= posts[i]._id %>">
+              <%= posts[i].title %>
+            </a>
+            <a href="/edit/<%= posts[i]._id %>">✏️</a>
+            <span class="delete" data-id="<%= posts[i]._id %>">🗑️</span>
+          </h4>
+          <p>
+            <%= posts[i].content %>
+          </p>
+        </div>
+        <% } %>
+    </div>
+    <a href = "/list/next/<%= posts[posts.length-1]._id %>">다음</a>
+
+    <script>
+      for (var i = 0; i < '<%=posts.length%>'; i++) {
+        document.querySelectorAll('.delete')[i].addEventListener('click', function (e) {
+          fetch('/delete?docid=' + e.target.dataset.id, {
+            method: 'DELETE'
+          })
+            .then((r) => r.text())
+            .then((r) => { 
+              e.target.parentElement.parentElement.style.display = 'none';
+            })
+        })
+      }
+    </script>
+</body>
+
 </html>
