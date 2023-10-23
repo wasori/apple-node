@@ -10,10 +10,11 @@
 
     <%- include('nav.ejs') %>
 
-    <form class="form-box" action = "/add" method="POST">
+    <form class="form-box" action = "/add" method="POST" enctype="multipart/form-data">
         <h4>글쓰기</h4>
         <input name = "title">
         <input name = "content">
+        <input type="file" name = "img1" accept="image/*">
         <button type="submit">전송</button>
     </form> 
   

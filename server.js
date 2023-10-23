@@ -3,6 +3,12 @@ const express = require('express')
 const app = express()
 const methodOverride = require('method-override')
 const bcrypt = require('bcrypt')
+require('dotenv').config();
+
+// 현재시간
+require('date-utils');
+var newDate = new Date();
+var time = newDate.toFormat('YYYY-MM-DD HH24:MI:SS');
 
 app.use(methodOverride('_method'))
 app.use(express.static(__dirname + '/public'))
@@ -27,13 +33,36 @@ app.use(session({
         maxAge: 60 * 60 * 1000
     },
     store : MongoStore.create({
-        mongoUrl : 'mongodb+srv://admin:qwer1234@cluster0.pakrwo1.mongodb.net/?retryWrites=true&w=majority',
+        mongoUrl : process.env.DB_URL,
         dbName : 'forum'
     })
 }))
 
 app.use(passport.session())
+app.use('/URL', checkLogin)
+app.use('/list', checkTime)
 
+// 이미지 업로드 관련 세팅
+const { S3Client } = require('@aws-sdk/client-s3')
+const multer = require('multer')
+const multerS3 = require('multer-s3')
+const s3 = new S3Client({
+  region : 'ap-northeast-2', // 서울 데이터센터
+  credentials : {
+      accessKeyId : 'AKIA4ETIBJXOEFOH6Y2B',
+      secretAccessKey : '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'
+  }
+})
+
+const upload = multer({
+  storage: multerS3({
+    s3: s3,
+    bucket: 'wasoriforum1',
+    key: function (요청, file, cb) {
+      cb(null, Date.now().toString()) //업로드시 파일명 변경가능
+    }
+  })
+})
 
 // MongoDB 라이브러리 사용관련
 const {
@@ -42,21 +71,35 @@ const {
 } = require('mongodb')
 
 let db
-const url = 'mongodb+srv://admin:qwer1234@cluster0.pakrwo1.mongodb.net/?retryWrites=true&w=majority'
+const url = process.env.DB_URL;
 new MongoClient(url).connect().then((client) => {
     console.log('DB연결성공')
     db = client.db('forum')
     // 서버 띄우는 코드임
-    app.listen(8080, () => {
+    app.listen(process.env.PORT, () => {
         console.log('http://localhost:8080 에서 서버 실행중')
     })
 }).catch((err) => {
     console.log(err)
 })
 
+function checkLogin (요청, 응답){
+    if(!요청.user){
+        응답.send('로그인하세요')
+    }
+}
+
+function checkTime (요청, 응답, next){
+    console.log(time);
+    next();
+}
+
+
 // 간단한 서버 기능임
 // 메인페이지 접속시 '반갑다' 보내주셈
-app.get('/', (요청, 응답) => {
+
+
+app.get('/', () => {} ,(요청, 응답) => {
     응답.sendFile(__dirname + '/index.html')
 })
 
@@ -90,22 +133,27 @@ app.get('/write', (요청, 응답) => {
 })
 
 app.post('/add', async (요청, 응답) => {
-    console.log(요청.body);
 
-    try {
-        if (요청.body.title == '') {
-            응답.send('제목 입력안했는데?');
-        } else {
-            await db.collection('post').insertOne({
-                title: 요청.body.title,
-                content: 요청.body.content
-            })
-            응답.redirect('/list');
+    upload.single('img1')(요청, 응답 , async (err) =>{
+        if(err) return 응답.send('업로드에러')
+        try {
+            if (요청.body.title == '') {
+                응답.send('제목 입력안했는데?');
+            } else {
+                await db.collection('post').insertOne({
+                    title: 요청.body.title,
+                    content: 요청.body.content,
+                    img : 요청.file.location
+                })
+                응답.redirect('/list');
+            }
+        } catch (e) {
+            console.log(e);
+            응답.status(500).send('서버에러남');
         }
-    } catch (e) {
-        console.log(e);
-        응답.status(500).send('서버에러남');
-    }
+    })
+
+    
 })
 
 app.get('/detail/:id', async (요청, 응답) => {
@@ -244,5 +292,5 @@ app.post('/register', async (요청, 응답) => {
         username: 요청.body.username,
         password: hash
     })
-    응답.redirect('/')
+    응답.redirect('/list/1')
 })
