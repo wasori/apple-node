@@ -1152,3 +1152,192 @@ const upload = multer({
     })
 
 이런느낌
+
+================================================================================
+
+[ API들 다른 파일로 분리하기 (ROUTER) ]
+
+- 무수한 app. 의 api를 분리해보자
+
+- api를 다른파일로 빼고 싶으면? -> routes 폴더 생성
+
+- const router = require('express').Router()
+
+router.get('/shop/shirts', (요청, 응답) => {
+    응답.send('셔츠파는 페이지임')
+})
+
+router.get('/shop/pants', (요청, 응답) => {
+    응답.send('바지파는 페이지임')
+})
+
+module.exports = router
+
+- 라우터 : 누군가를 이리저리 안내하는 기계
+
+- server.js로 require 해야함 => app.use('/',require('./routes/shop.js'))
+
+- ( 참고 ) require 문법 싫으면 import 사용가능
+
+- ( 참고2 ) 공통된 URL 시작 부분은 축약가능 : 중복부분 지우고 app.use('/shop',require('./routes/shop.js')) 이렇게 쓰면 됨
+
+- 관련있는 API 들은 URL비슷하게 만드는게 좋음
+
+- 다른 파일에서 DB변수 쓰려면? db설정부분 그대로 북붙?
+
+- 그렇게되면 파일마다 연결되기때문에 파일이 100개라면 100번 연결됨
+
+- database.js 생성 -> db연결코드 분리
+
+- const { MongoClient } = require("mongodb")
+ 
+const url = process.env.DB_URL;
+new MongoClient(url).connect()
+
+- let db까지export하면 편할듯
+
+================================================================================
+
+[ 검색기능 만들기 ]
+
+- 게시물 검색기능 ? 
+
+- 1. input과 버튼에서 서버로 검색어 전송하면
+
+- 2. 서버는 그 검색어 포함된 document 가져와서
+
+- 3. ejs에 넣어서 유저에게 보내줌
+
+- 서버로 데이터 전송하려면 <form> 쓰거나 fetch 쓰거나~
+
+- 검색버튼 누르면 서버로 get요청
+
+- 근데 input에 입력한 값도 query string 으로 보낼것임
+
+- <script>
+      document.querySelector('.search-send').addEventListener('click',function(){
+        let 입력한거 = document.querySelector('.search').value
+        location.href='/search?val='+ 입력한거
+      })
+    </script>
+
+- 서버에도 기능 추가
+
+- app.get('/search', async (요청, 응답) => {
+    console.log(요청.query.val)
+    let result = await db.collection('post').find({title: 요청.query.val}).toArray()
+    응답.render('search.ejs', {posts : result})
+})
+
+- 새로운 ejs파일 생성 ( search.ejs )
+
+- 일부만 맞아도 검색하려면? => 정규식 사용
+
+- let result = await db.collection('post').find({title: {$regex : 요청.query.val}}).toArray() 이렇게 바꾸면 끝
+
+- 심각한 문제점 : 느려터짐 . document가 많은 경우 .find() 쓰면 개느림
+
+- 빠르게 찾고싶으면 index를 만들어두면 됨
+
+-----------------------------------------------------------------------------------------------------------------
+
+[ 검색기능 : index ] 
+
+- document가 많아질수록 find()는 느려짐
+
+- document가 많아도 빠르게 찾으려면 index를 미리 만들어 두면 된다.
+
+- 쉽게 생각하면 1~100중 생각한 숫자 찾기 ( 50보다 큼? -> 절반 날아감) => Binary search ( 절반 잘라가며 찾기 )
+
+- 2/3씩 자를수도 있음. 3/4도 가능
+
+- 조건이 있는데 자료를 미리 정렬해놔야함 collection을 복사해서 놔둔거 완전 검색용
+
+- mongoDB에 가보면 index만드는 버튼 있음.
+
+- "title":"text"or 1or -1 셋중에 하나 써야함 (1은 오름차순 숫자, -1은 내림차순 숫자 )
+
+- index 사용해서 document 찾으려면
+
+ -app.get('/search', async (요청, 응답) => {
+    console.log(요청.query.val)
+    let result = await db.collection('post').find({
+        $text: {
+            $search : 요청.query.val
+        }
+    }).toArray()
+    응답.render('search.ejs', {
+        posts: result
+    })
+}) 이렇게 수정하면 됨
+
+- 문자말고 숫자 index는 저렇게 하지말고 find 그대로 써도 자동으로 찾아짐
+
+- .find() 성능평가 하려면 대신 .explain('executionStats') 를 쓰면 얼마나 걸리는지 분석해줌
+
+- 단점 1. 만들면 용량차지함 2. document 추가/ 수정/ 삭제 시 index에도 반영해야함
+
+- 지금 정확한 단어만 검색가능한데요? => 정규식? 정규식쓰면 index사용 못함
+
+- 한국어는 조사가 많아서 text index만들어봣자 쓸모가 없음 지우자. ==> 숫자검색 많을때 여기서 index만들면 됨
+
+- 네이버같은 검색창 만들고싶으면? ==> Search index (Full texxt index) 만들면 됨
+
+===============================================================================
+
+[ 검색기능 만들기 : search index ]
+
+- 검색속도 빠름, 부분단어 검색 가능 -> mongodb 페이지에서 search 들어가기
+
+- search index 동작원리
+
+- 1. 문장에서 조사, 불용어 등 제거
+
+- 2. 모든 단어들 뽑아서 정렬
+
+- 3. 어떤 document에 등장했는지 표기
+
+- search index 써서 document 검색하려면
+
+-  let result = await db.collection('post').aggregate([{조건1},{조건2}]).toArray() 이런 문법 써야함
+
+- app.get('/search', async (요청, 응답) => {
+    console.log(요청.query.val)
+    let 검색조건 = [
+        {
+          $search : {
+            index : 'title_index',
+            text : { query : 요청.query.val , path : 'title' }
+          }
+        }
+    ]
+    let result = await db.collection('post').aggregate(검색조건).toArray()
+    응답.render('search.ejs', {
+        posts: result
+    })
+})
+
+- aggregate에 여러 조건 설정가능
+
+- let 검색조건 = [
+        {
+          $search : {
+            index : 'title_index',
+            text : { query : 요청.query.val , path : 'title' }
+          }
+        },
+        { $sort : { 날짜 : 1 }}, // 날짜를 오름차순으로 정렬해줘
+        { $limit : 10 }, // 10개까지만 보여줘
+        { $skip : 10 }, // 10개를 생략하고 보여줘
+        { $project : {title : 0}} // title 필드를 숨겨주세요. 1 이면 보여주세요
+    ]
+
+================================================================================
+
+[ 게시판에 회원기능을 넣자& 비정규화 ]
+
+- Q. 글의 주인만 삭제 가능하도록? - 지금은 글을 누가 썼는지 모름
+
+- document 발행할때 글쓴이 _id도 추가하면 될듯
+
+- 글 발행할때 글쓴이의 _id를 추가하자

@@ -32,9 +32,9 @@ app.use(session({
     cookie: {
         maxAge: 60 * 60 * 1000
     },
-    store : MongoStore.create({
-        mongoUrl : process.env.DB_URL,
-        dbName : 'forum'
+    store: MongoStore.create({
+        mongoUrl: process.env.DB_URL,
+        dbName: 'forum'
     })
 }))
 
@@ -43,25 +43,27 @@ app.use('/URL', checkLogin)
 app.use('/list', checkTime)
 
 // 이미지 업로드 관련 세팅
-const { S3Client } = require('@aws-sdk/client-s3')
+const {
+    S3Client
+} = require('@aws-sdk/client-s3')
 const multer = require('multer')
 const multerS3 = require('multer-s3')
 const s3 = new S3Client({
-  region : 'ap-northeast-2', // 서울 데이터센터
-  credentials : {
-      accessKeyId : 'AKIA4ETIBJXOEFOH6Y2B',
-      secretAccessKey : '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'
-  }
+    region: 'ap-northeast-2', // 서울 데이터센터
+    credentials: {
+        accessKeyId: 'AKIA4ETIBJXOEFOH6Y2B',
+        secretAccessKey: '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'
+    }
 })
 
 const upload = multer({
-  storage: multerS3({
-    s3: s3,
-    bucket: 'wasoriforum1',
-    key: function (요청, file, cb) {
-      cb(null, Date.now().toString()) //업로드시 파일명 변경가능
-    }
-  })
+    storage: multerS3({
+        s3: s3,
+        bucket: 'wasoriforum1',
+        key: function (요청, file, cb) {
+            cb(null, Date.now().toString()) //업로드시 파일명 변경가능
+        }
+    })
 })
 
 // MongoDB 라이브러리 사용관련
@@ -70,9 +72,10 @@ const {
     ObjectId
 } = require('mongodb')
 
+let connectDB = require('./database.js')
+
 let db
-const url = process.env.DB_URL;
-new MongoClient(url).connect().then((client) => {
+connectDB.then((client) => {
     console.log('DB연결성공')
     db = client.db('forum')
     // 서버 띄우는 코드임
@@ -83,13 +86,13 @@ new MongoClient(url).connect().then((client) => {
     console.log(err)
 })
 
-function checkLogin (요청, 응답){
-    if(!요청.user){
+function checkLogin(요청, 응답) {
+    if (!요청.user) {
         응답.send('로그인하세요')
     }
 }
 
-function checkTime (요청, 응답, next){
+function checkTime(요청, 응답, next) {
     console.log(time);
     next();
 }
@@ -99,7 +102,7 @@ function checkTime (요청, 응답, next){
 // 메인페이지 접속시 '반갑다' 보내주셈
 
 
-app.get('/', () => {} ,(요청, 응답) => {
+app.get('/', () => {}, (요청, 응답) => {
     응답.sendFile(__dirname + '/index.html')
 })
 
@@ -134,26 +137,27 @@ app.get('/write', (요청, 응답) => {
 
 app.post('/add', async (요청, 응답) => {
 
-    upload.single('img1')(요청, 응답 , async (err) =>{
-        if(err) return 응답.send('업로드에러')
-        try {
-            if (요청.body.title == '') {
-                응답.send('제목 입력안했는데?');
-            } else {
-                await db.collection('post').insertOne({
-                    title: 요청.body.title,
-                    content: 요청.body.content,
-                    img : 요청.file.location
-                })
-                응답.redirect('/list');
-            }
-        } catch (e) {
-            console.log(e);
-            응답.status(500).send('서버에러남');
-        }
+    upload.single('img1')(요청, 응답, async (err) => {
+        console.log(요청.user);
+    //     if (err) return 응답.send('업로드에러')
+    //     try {
+    //         if (요청.body.title == '') {
+    //             응답.send('제목 입력안했는데?');
+    //         } else {
+    //             await db.collection('post').insertOne({
+    //                 title: 요청.body.title,
+    //                 content: 요청.body.content,
+    //                 img: 요청.file ? 요청.file.location : '',
+    //                 user : 요청.user._id,
+    //                 username : 유저.user.username
+    //             })
+    //             응답.redirect('/list/1');
+    //         }
+    //     } catch (e) {
+    //         console.log(e);
+    //         응답.status(500).send('서버에러남');
+    //     }
     })
-
-    
 })
 
 app.get('/detail/:id', async (요청, 응답) => {
@@ -234,17 +238,23 @@ app.get('/list/next/:id', async (요청, 응답) => {
 
 
 passport.use(new LocalStrategy(async (입력한아이디, 입력한비번, cb) => {
-    let result = await db.collection('user').findOne({ username : 입력한아이디})
+    let result = await db.collection('user').findOne({
+        username: 입력한아이디
+    })
     if (!result) {
-      return cb(null, false, { message: '아이디 DB에 없음' })
+        return cb(null, false, {
+            message: '아이디 DB에 없음'
+        })
     }
-  
+
     if (await bcrypt.compare(입력한비번, result.password)) {
-      return cb(null, result)
+        return cb(null, result)
     } else {
-      return cb(null, false, { message: '비번불일치' });
+        return cb(null, false, {
+            message: '비번불일치'
+        });
     }
-  })) 
+}))
 
 passport.serializeUser((user, done) => {
     process.nextTick(() => {
@@ -293,4 +303,26 @@ app.post('/register', async (요청, 응답) => {
         password: hash
     })
     응답.redirect('/list/1')
+})
+
+app.use('/shop', require('./routes/shop.js'))
+
+app.get('/search', async (요청, 응답) => {
+    console.log(요청.query.val)
+    let 검색조건 = [
+        {
+          $search : {
+            index : 'title_index',
+            text : { query : 요청.query.val , path : 'title' }
+          }
+        },
+        //{ $sort : { 날짜 : 1 }}, // 날짜를 오름차순으로 정렬해줘
+        //{ $limit : 10 }, // 10개까지만 보여줘
+        //{ $skip : 10 }, // 10개를 생략하고 보여줘
+        //{ $project : {title : 0}} // title 필드를 숨겨주세요. 1 이면 보여주세요
+    ]
+    let result = await db.collection('post').aggregate(검색조건).toArray()
+    응답.render('search.ejs', {
+        posts: result
+    })
 })
